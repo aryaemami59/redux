@@ -1,4 +1,4 @@
-const fs = require('fs')
+const fs = require('node:fs')
 const helperModuleImports = require('@babel/helper-module-imports')
 
 /**
@@ -6,6 +6,9 @@ const helperModuleImports = require('@babel/helper-module-imports')
  *
  * Adapted from React (https://github.com/facebook/react/blob/master/scripts/shared/evalToString.js) with some
  * adjustments
+ *
+ * @param {{ type?: any; value?: any; operator?: string; left?: any; right?: any; quasis?: any[]; name?: any; }} ast
+ * @returns {string}
  */
 const evalToString = ast => {
   switch (ast.type) {
@@ -18,7 +21,7 @@ const evalToString = ast => {
       }
       return evalToString(ast.left) + evalToString(ast.right)
     case 'TemplateLiteral':
-      return ast.quasis.reduce(
+      return ast.quasis?.reduce(
         (concatenatedValue, templateElement) =>
           concatenatedValue + templateElement.value.raw,
         ''
@@ -53,7 +56,7 @@ const evalToString = ast => {
  *    throw new Error(node.process.NODE_ENV === 'production' ? 0 : "This is my error message.");
  *    throw new Error(node.process.NODE_ENV === 'production' ? 1 : "This is a second error message.");
  */
-module.exports = babel => {
+module.exports = (/** @type {{ types: any; }} */ babel) => {
   const t = babel.types
   // When the plugin starts up, we'll load in the existing file. This allows us to continually add to it so that the
   // indexes do not change between builds.
@@ -70,7 +73,17 @@ module.exports = babel => {
       changeInArray = false
     },
     visitor: {
+      /**
+       * @param {import("@babel/traverse").NodePath<import("@babel/types").Node>} path
+       * @param {{ opts: { minify: any; }; }} file
+       */
       ThrowStatement(path, file) {
+        if (
+          !('argument' in path.node && path.node.argument) ||
+          !('arguments' in path.node.argument)
+        ) {
+          return
+        }
         const args = path.node.argument.arguments
         const minify = file.opts.minify
 
@@ -106,7 +119,7 @@ module.exports = babel => {
           const formatProdErrorMessageIdentifier = helperModuleImports.addNamed(
             path,
             'formatProdErrorMessage',
-            'src/utils/formatProdErrorMessage',
+            '@internal/utils/formatProdErrorMessage',
             { nameHint: 'formatProdErrorMessage' }
           )
 
