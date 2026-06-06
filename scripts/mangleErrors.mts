@@ -1,21 +1,35 @@
 import type { Node, PluginObj, PluginPass } from '@babel/core'
 import * as helperModuleImports from '@babel/helper-module-imports'
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 type Babel = typeof import('@babel/core')
+
+// NOTE: `import.meta.dirname` here is the repo root, not `scripts/`, because
+// `tsup` loads `tsup.config.ts` via `bundle-require`, which writes the bundled
+// config next to the config file. A loader that runs this plugin unbundled
+// (e.g. the `tsdown` migration in #4906) needs a `'..'` segment instead.
+const formatProdErrorMessageAbsoluteFilePath = path.join(
+  import.meta.dirname,
+  'src',
+  'utils',
+  'formatProdErrorMessage.ts'
+)
 
 /**
  * Represents the options for the {@linkcode mangleErrorsPlugin}.
  *
  * @internal
  */
-export interface MangleErrorsPluginOptions {
+export type MangleErrorsPluginOptions = {
   /**
    * Whether to minify the error messages or not.
    * If `true`, the error messages will be replaced with an index
    * that maps object lookup.
+   *
+   * @default false
    */
-  minify: boolean
+  minify?: boolean | undefined
 }
 
 /**
@@ -101,18 +115,23 @@ export const mangleErrorsPlugin = (
           return
         }
         const args = path.node.argument.arguments
-        const { minify } = options
+        const { minify = false } = options
 
         if (args && args[0]) {
           // Skip running this logic when certain types come up:
           //  Identifier comes up when a variable is thrown (E.g. throw new error(message))
           //  NumericLiteral, CallExpression, and ConditionalExpression is code we have already processed
+
+          const firstArgument = args[0]
+
           if (
-            path.node.argument.arguments[0].type === 'Identifier' ||
-            path.node.argument.arguments[0].type === 'NumericLiteral' ||
-            path.node.argument.arguments[0].type === 'ConditionalExpression' ||
-            path.node.argument.arguments[0].type === 'CallExpression' ||
-            !t.isExpression(path.node.argument.arguments[0]) ||
+            firstArgument.type === 'Identifier' ||
+            firstArgument.type === 'NumericLiteral' ||
+            firstArgument.type === 'ConditionalExpression' ||
+            firstArgument.type === 'CallExpression' ||
+            firstArgument.type === 'ObjectExpression' ||
+            firstArgument.type === 'MemberExpression' ||
+            !t.isExpression(firstArgument) ||
             !t.isIdentifier(path.node.argument.callee)
           ) {
             return
@@ -120,7 +139,7 @@ export const mangleErrorsPlugin = (
 
           const errorName = path.node.argument.callee.name
 
-          const errorMsgLiteral = evalToString(path.node.argument.arguments[0])
+          const errorMsgLiteral = evalToString(firstArgument)
 
           if (errorMsgLiteral.includes('Super expression')) {
             // ignore Babel runtime error message
@@ -139,7 +158,7 @@ export const mangleErrorsPlugin = (
           const formatProdErrorMessageIdentifier = helperModuleImports.addNamed(
             path,
             'formatProdErrorMessage',
-            '@internal/utils/formatProdErrorMessage',
+            formatProdErrorMessageAbsoluteFilePath,
             { nameHint: 'formatProdErrorMessage' }
           )
 
@@ -149,10 +168,19 @@ export const mangleErrorsPlugin = (
             [t.numericLiteral(errorIndex)]
           )
 
+          const prodMessageWithPureAnnotation = t.addComment(
+            prodMessage,
+            'leading',
+            ' @__PURE__ ',
+            false
+          )
+
           if (minify) {
             path.replaceWith(
               t.throwStatement(
-                t.newExpression(t.identifier(errorName), [prodMessage])
+                t.newExpression(t.identifier(errorName), [
+                  prodMessageWithPureAnnotation
+                ])
               )
             )
           } else {
@@ -162,11 +190,17 @@ export const mangleErrorsPlugin = (
                   t.conditionalExpression(
                     t.binaryExpression(
                       '===',
-                      t.identifier('process.env.NODE_ENV'),
+                      t.memberExpression(
+                        t.memberExpression(
+                          t.identifier('process'),
+                          t.identifier('env')
+                        ),
+                        t.identifier('NODE_ENV')
+                      ),
                       t.stringLiteral('production')
                     ),
-                    prodMessage,
-                    path.node.argument.arguments[0]
+                    prodMessageWithPureAnnotation,
+                    firstArgument
                   )
                 ])
               )

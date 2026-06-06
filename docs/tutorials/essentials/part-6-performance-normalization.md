@@ -293,14 +293,14 @@ export const LoginPage = () => {
     await dispatch(login(username))
     navigate('/posts')
   }
-
 ```
 
 Since the `userLoggedOut` action creator was being used by the `postsSlice`, we can update that to listen to `logout.fulfilled` instead:
 
 ```ts title="features/posts/postsSlice.ts"
-import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { client } from '@/api/client'
+import type { PayloadAction } from '@reduxjs/toolkit'
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 
 import type { RootState } from '@/app/store'
 
@@ -314,9 +314,7 @@ import { logout } from '@/features/auth/authSlice'
 const postsSlice = createSlice({
   name,
   initialState,
-  reducers: {
-    /* omitted */
-  },
+  reducers: {/* omitted */},
   extraReducers: builder => {
     builder
       // highlight-start
@@ -1052,7 +1050,7 @@ We're going to need to import `createEntityAdapter`, create an instance that has
 import {
   // highlight-start
   createEntityAdapter,
-  EntityState
+  type EntityState
   // highlight-end
   // omit other imports
 } from '@reduxjs/toolkit'
@@ -1504,18 +1502,17 @@ Now we can go add a listener that will watch for the `addNewPost.fulfilled` acti
 There's [multiple approaches we can use for defining listeners in our codebase](https://redux-toolkit.js.org/api/createListenerMiddleware#organizing-listeners-in-files). That said, it's usually a good practice to define listeners in whatever slice file seems most related to the logic we want to add. In this case, we want to show a toast when a post gets added, so let's add this listener in the `postsSlice` file:
 
 ```ts title="features/posts/postsSlice.ts"
+import type { EntityState, PayloadAction } from '@reduxjs/toolkit'
 import {
   createEntityAdapter,
   createSelector,
-  createSlice,
-  EntityState,
-  PayloadAction
+  createSlice
 } from '@reduxjs/toolkit'
 import { client } from '@/api/client'
 
 import type { RootState } from '@/app/store'
 // highlight-next-line
-import { AppStartListening } from '@/app/listenerMiddleware'
+import type { AppStartListening } from '@/app/listenerMiddleware'
 import { createAppAsyncThunk } from '@/app/withTypes'
 
 // omit types, initial state, slice definition, and selectors
