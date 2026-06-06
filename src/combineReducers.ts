@@ -5,11 +5,10 @@ import type {
   Reducer,
   StateFromReducersMapObject
 } from './types/reducers'
-
-import ActionTypes from './utils/actionTypes'
-import isPlainObject from './utils/isPlainObject'
-import warning from './utils/warning'
+import { ActionTypes } from './utils/actionTypes'
+import { isPlainObject } from './utils/isPlainObject'
 import { kindOf } from './utils/kindOf'
+import { warning } from './utils/warning'
 
 function getUnexpectedStateShapeWarningMessage(
   inputState: object,
@@ -57,6 +56,8 @@ function getUnexpectedStateShapeWarningMessage(
       `"${reducerKeys.join('", "')}". Unexpected keys will be ignored.`
     )
   }
+
+  return undefined
 }
 
 function assertReducerShape(reducers: {
@@ -111,7 +112,7 @@ function assertReducerShape(reducers: {
  * @returns A reducer function that invokes every reducer inside the passed
  *   object, and builds a state object with the same shape.
  */
-export default function combineReducers<M>(
+export function combineReducers<M>(
   reducers: M
 ): M[keyof M] extends Reducer<any, any, any> | undefined
   ? Reducer<
@@ -120,7 +121,7 @@ export default function combineReducers<M>(
       Partial<PreloadedStateShapeFromReducersMapObject<M>>
     >
   : never
-export default function combineReducers(reducers: {
+export function combineReducers(reducers: {
   [key: string]: Reducer<any, any, any>
 }) {
   const reducerKeys = Object.keys(reducers)
