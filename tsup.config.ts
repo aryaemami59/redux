@@ -3,6 +3,7 @@ import type { Plugin } from 'esbuild'
 import { getBuildExtensions } from 'esbuild-extra'
 import type { Options } from 'tsup'
 import { defineConfig } from 'tsup'
+import packageJson from './package.json' with { type: 'json' }
 import type { MangleErrorsPluginOptions } from './scripts/mangleErrors.mjs'
 import { mangleErrorsPlugin } from './scripts/mangleErrors.mjs'
 
@@ -10,7 +11,7 @@ const tsconfig = 'tsconfig.build.json' satisfies Options['tsconfig']
 
 // Extract error strings, replace them with error codes, and write messages to a file
 const mangleErrorsTransform: Plugin = {
-  name: mangleErrorsPlugin.name,
+  name: `${packageJson.name}:mangle-errors`,
   setup(build) {
     const { onTransform } = getBuildExtensions(build, mangleErrorsPlugin.name)
 
